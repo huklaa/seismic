@@ -8,7 +8,6 @@ import type { EncryptionNonce } from '@sviem/crypto/nonce.ts'
 
 export class AesGcmCrypto {
   private readonly NONCE_LENGTH = 12 // 96 bits is the recommended nonce length for GCM
-  private readonly U64_SIZE = 8 // Size of u64 in bytes
 
   constructor(private readonly key: Hex) {
     const keyBuffer = hexToBytes(key)
@@ -17,26 +16,25 @@ export class AesGcmCrypto {
     }
   }
 
-  /**
-   * Creates a nonce from a u64 number, matching Rust's implementation
-   * @param num - The number to convert (will be treated as u64)
-   */
+  /** Creates a nonce from a u96 integer, matching Rust's implementation. */
   private numberToNonce(num: bigint | number): Uint8Array {
-    let value = BigInt(num)
+    if (typeof num === 'number' && !Number.isSafeInteger(num)) {
+      throw new RangeError('Numeric nonce must be a safe integer')
+    }
 
-    // Create a buffer for the full nonce (12 bytes)
+    let value = BigInt(num)
+    if (value < 0n || value >= 1n << 96n) {
+      throw new RangeError(
+        'Numeric nonce must fit in an unsigned 96-bit integer'
+      )
+    }
+
     const nonceBuffer = new Uint8Array(this.NONCE_LENGTH)
-    // Write the u64 value in big-endian format to the last 8 bytes
-    for (
-      let i = this.NONCE_LENGTH - 1;
-      i >= this.NONCE_LENGTH - this.U64_SIZE;
-      i--
-    ) {
+    for (let i = this.NONCE_LENGTH - 1; i >= 0; i--) {
       nonceBuffer[i] = Number(value & 0xffn)
       value = value >> 8n
     }
 
-    // First 4 bytes remain as zeros
     return nonceBuffer
   }
 
