@@ -1,4 +1,4 @@
-import { describe, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 
 import {
   testAddressExplorerUrlBuildsCorrectUrl,
@@ -44,6 +44,7 @@ import {
   testEmptyAuthorizationListHash,
   testTypedDataIncludesAuthorizationListHash,
 } from '@sviem-tests/tests/typedDataUnit.ts'
+import { AesGcmCrypto } from '@sviem/crypto/aes.ts'
 
 describe('Explorer URL utilities', () => {
   test(
@@ -145,4 +146,28 @@ describe('Seismic EIP-712 typed data', () => {
     'includes authorizationListHash',
     testTypedDataIncludesAuthorizationListHash
   )
+})
+
+describe('AES-GCM numeric nonces', () => {
+  const crypto = new AesGcmCrypto(
+    '0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'
+  )
+
+  test('encodes the complete unsigned 96-bit field', () => {
+    expect(crypto.createNonce(5n)).toBe('0x000000000000000000000005')
+    expect(crypto.createNonce(2n ** 64n + 5n)).toBe(
+      '0x000000010000000000000005'
+    )
+    expect(crypto.createNonce(2n ** 96n - 1n)).toBe(
+      '0xffffffffffffffffffffffff'
+    )
+  })
+
+  test('rejects values outside the unsigned 96-bit domain', () => {
+    expect(() => crypto.createNonce(-1n)).toThrow(RangeError)
+    expect(() => crypto.createNonce(2n ** 96n)).toThrow(RangeError)
+    expect(() => crypto.createNonce(Number.MAX_SAFE_INTEGER + 1)).toThrow(
+      RangeError
+    )
+  })
 })

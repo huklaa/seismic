@@ -101,6 +101,8 @@ seismic-viem
 | **Encryption**          | ECDH key exchange, AES-GCM calldata encryption                  |
 | **Precompiles**         | RNG, ECDH, AES-GCM, HKDF, secp256k1 signing precompile bindings |
 
+`AesGcmCrypto` accepts numeric nonces across the complete unsigned 96-bit AES-GCM nonce field. Use a `bigint` above JavaScript's safe-integer limit; negative values and values at or above `2n ** 96n` are rejected.
+
 ## Features
 
 - **Shielded Transactions** -- Encrypt calldata with TEE public key via AES-GCM before sending
