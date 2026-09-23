@@ -1,6 +1,10 @@
 """Tests for seismic_web3.contract.shielded — ShieldedContract namespaces."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from eth_abi import encode
+from web3 import Web3
 
 from seismic_web3._types import (
     CompressedPublicKey,
@@ -15,6 +19,7 @@ _NETWORK_PK = CompressedPublicKey(
 _CLIENT_SK = PrivateKey(
     "0xa30363336e1bb949185292a2a302de86e447d98f3a43d823c8c234d9e3e5ad77"
 )
+_ADDR = Web3.to_checksum_address("0xd3e8763675e4c425df46cc3b5c0f6cbdac396046")
 
 COUNTER_ABI = [
     {
@@ -30,6 +35,13 @@ COUNTER_ABI = [
         "inputs": [],
         "outputs": [],
         "stateMutability": "nonpayable",
+    },
+    {
+        "type": "function",
+        "name": "getNumber",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
     },
 ]
 
@@ -111,6 +123,22 @@ class TestShieldedContract:
         fn = contract.dwrite.setNumber
         assert callable(fn)
 
+    def test_smart_transparent_read_forwards_value_and_gas(self):
+        w3 = MagicMock()
+        w3.eth.call.return_value = encode(["uint256"], [7])
+        contract = ShieldedContract(
+            w3,
+            _make_encryption(),
+            PrivateKey(b"\x01" * 32),
+            _ADDR,
+            COUNTER_ABI,
+        )
+
+        assert contract.read.getNumber(value=9, gas=0) == 7
+        request = w3.eth.call.call_args.args[0]
+        assert request["value"] == 9
+        assert request["gas"] == 0
+
 
 class TestAsyncShieldedContract:
     def test_has_all_namespaces(self):
@@ -140,3 +168,20 @@ class TestAsyncShieldedContract:
         contract = AsyncShieldedContract(w3, encryption, pk, addr, COUNTER_ABI)
         fn = contract.write.increment
         assert callable(fn)
+
+    @pytest.mark.asyncio
+    async def test_smart_transparent_read_forwards_value_and_gas(self):
+        w3 = MagicMock()
+        w3.eth.call = AsyncMock(return_value=encode(["uint256"], [7]))
+        contract = AsyncShieldedContract(
+            w3,
+            _make_encryption(),
+            PrivateKey(b"\x01" * 32),
+            _ADDR,
+            COUNTER_ABI,
+        )
+
+        assert await contract.read.getNumber(value=9, gas=0) == 7
+        request = w3.eth.call.call_args.args[0]
+        assert request["value"] == 9
+        assert request["gas"] == 0
